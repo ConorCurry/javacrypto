@@ -9,18 +9,51 @@ import java.util.*;
 
 public class CryptoTests {
     public static void main(String[] args) {
-	Scanner keyboard = new Scanner(System.in);
-	System.out.println("Please enter the string you would like to encrypt");
-	String msg = keyboard.nextLine();
 	Security.addProvider(new BouncyCastleProvider());
-	System.out.println("---AES---");
-	testAES(msg);
-	System.out.println("---Blowfish---");
-	testBlowfish(msg);
-	System.out.println("---RSA---");
-	testRSA(msg);
+	Scanner keyboard = new Scanner(System.in);
+	System.out.print("Would you like to run a performance test? (y/n): ");
+			   
+	String resp = keyboard.nextLine();
+	if(resp.equals("y")) {
+	    System.out.println("Running performance tests...");
+	    System.out.println("Computing encryption/decryption of 100 random 32 char Strings...\n");
+	    String[] randStrings = getRandStrings(100, 32);
+	    System.out.print("Using 128-bit AES...");
+	    long deltaAES = System.currentTimeMillis();
+	    for(String rand : randStrings) testAES(rand, false);
+	    deltaAES = System.currentTimeMillis() - deltaAES;
+	    System.out.println("Done!");
+	    System.out.print("Using 128-bit Blowfish...");
+	    long deltaBlowfish = System.currentTimeMillis();
+	    for(String rand : randStrings) testBlowfish(rand, false);
+	    deltaBlowfish = System.currentTimeMillis() - deltaBlowfish;
+	    System.out.println("Done!");
+	    System.out.print("Using 1024-bit RSA...");
+	    long deltaRSA = System.currentTimeMillis();
+	    for(String rand : randStrings) testRSA(rand, false);
+	    deltaRSA = System.currentTimeMillis() - deltaRSA;
+	    System.out.println("Done!\n");
+
+	    System.out.println("---Results---");
+	    System.out.printf("AES was %.2f times faster than RSA\n", (float)deltaRSA/deltaAES);
+	    System.out.printf("Blowfish was %.2f times faster than RSA\n", 
+			      (float)deltaRSA/deltaBlowfish);
+	    System.out.printf("Blowfish was %.2f times faster than AES\n", 
+			      (float)deltaAES/deltaBlowfish);
+	} else {
+	    System.out.println("Please enter the string you would like to encrypt");
+	    String msg = keyboard.nextLine();
+	    System.out.println("---AES---");
+	    testAES(msg, true);
+	    System.out.println("---Blowfish---");
+	    testBlowfish(msg, true);
+	    System.out.println("---RSA---");
+	    testRSA(msg, true);
+	    System.out.println("---RSA Signature---");
+	    signRSA(msg, true);
+	}
     }
-    public static void testAES(String msg) {
+    public static void testAES(String msg, boolean printOut) {
 	SecretKeySpec key = null;
 	IvParameterSpec iv = null;
 	KeyGenerator keyGen = null;
@@ -60,7 +93,9 @@ public class CryptoTests {
 	    cipher.init(Cipher.DECRYPT_MODE, key, iv);
 	    
 	    plaintext = cipher.doFinal(ciphertext);
-	    System.out.println("Decrypted Plaintext: " + new String(plaintext));
+	    if(printOut) {
+		System.out.println("Decrypted Plaintext: " + new String(plaintext));
+	    }
 	} catch (Exception e) {
 	    System.err.print("In decryption: ");
 	    System.err.println(e);
@@ -68,7 +103,7 @@ public class CryptoTests {
 	}
 
     }
-    public static void testBlowfish(String msg) {
+    public static void testBlowfish(String msg, boolean printOut) {
 	SecretKeySpec key = null;
 	IvParameterSpec iv = null;
 	KeyGenerator keyGen = null;
@@ -108,21 +143,21 @@ public class CryptoTests {
 	    cipher.init(Cipher.DECRYPT_MODE, key, iv);
 	    
 	    plaintext = cipher.doFinal(ciphertext);
-	    System.out.println("Decrypted Plaintext: " + new String(plaintext));
+	    if(printOut) {
+		System.out.println("Decrypted Plaintext: " + new String(plaintext));
+	    }
 	} catch (Exception e) {
 	    System.err.print("In decryption: ");
 	    System.err.println(e);
 	    System.exit(1);
 	}
     }
-    public static void testRSA(String msg) {
+    public static void testRSA(String msg, boolean printOut) {
 	KeyPairGenerator keyPairGen = null;
 	KeyPair pair = null;
 	Cipher cipher = null;
 	byte[] ciphertext = null;
 	byte[] plaintext = null;
-	Signature sign = null;
-	byte[] signature = null;
 	//Generate keypair
 	try {
 	    keyPairGen = KeyPairGenerator.getInstance("RSA", "BC");
@@ -142,20 +177,31 @@ public class CryptoTests {
 	    //decrypt ciphertext
 	    cipher.init(Cipher.DECRYPT_MODE, pair.getPrivate());
 	    plaintext = cipher.doFinal(ciphertext);
-	    System.out.println("Decrypted Plaintext: " + new String(plaintext));
+	    if(printOut) {
+		System.out.println("Decrypted Plaintext: " + new String(plaintext));
+	    }
 	} catch (Exception e) {
 	    System.err.print("In encrypt/decrypt: ");
 	    System.err.println(e);
 	    System.exit(1);
 	}
+    }
+    public static void signRSA(String msg, boolean printOut) {
+	KeyPairGenerator keyPairGen = null;
+	KeyPair pair = null;
+	Signature sign = null;
+	byte[] signature = null;
 	//generate RSA signature over msg
 	try {
-	System.out.println("Signing message...");
-	sign = Signature.getInstance("SHA256withRSA", "BC");
-	sign.initSign(pair.getPrivate());
+	    keyPairGen = KeyPairGenerator.getInstance("RSA", "BC");
+	    keyPairGen.initialize(1024, new SecureRandom());
+	
+	    pair = keyPairGen.generateKeyPair();
+	    sign = Signature.getInstance("SHA256withRSA", "BC");
+	    sign.initSign(pair.getPrivate());
 
-	sign.update(msg.getBytes());
-	signature = sign.sign();
+	    sign.update(msg.getBytes());
+	    signature = sign.sign();
 	} catch (Exception e) {
 	    System.err.print("In RSA signing: ");
 	    System.err.println(e);
@@ -165,9 +211,9 @@ public class CryptoTests {
 	try {
 	    sign.initVerify(pair.getPublic());
 	    sign.update(msg.getBytes());
-	    if(sign.verify(signature)) {
+	    if(sign.verify(signature) && printOut) {
 		System.out.println("Verified RSA signature!");
-	    } else {
+	    } else if (printOut) {
 		System.out.println("Failed to verify RSA signature.");
 	    }
 	} catch (Exception e) {
@@ -175,5 +221,17 @@ public class CryptoTests {
 	    System.err.println(e);
 	    System.exit(1);
 	}
+    }
+    public static String[] getRandStrings(int numStrings, int length) {
+	String[] randStrings = new String[numStrings];
+	Random rand = new Random();
+	for(int i = 0; i < numStrings; i++) {
+	    String randChars = "";
+	    for(int j = 0; j < length; j++) {
+		randChars += (char)(rand.nextInt(127-32) + 32);
+	    }
+	    randStrings[i] = randChars;
+	}
+	return randStrings;
     }
 }
