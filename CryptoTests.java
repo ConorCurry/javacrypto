@@ -3,6 +3,8 @@ import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.security.*;
+import java.security.spec.RSAPrivateKeySpec;
+import java.security.spec.RSAPublicKeySpec;
 import java.util.*;
 
 public class CryptoTests {
@@ -15,6 +17,8 @@ public class CryptoTests {
 	testAES(msg);
 	System.out.println("---Blowfish---");
 	testBlowfish(msg);
+	System.out.println("---RSA---");
+	testRSA(msg);
     }
     public static void testAES(String msg) {
 	SecretKeySpec key = null;
@@ -44,7 +48,6 @@ public class CryptoTests {
 	    iv = new IvParameterSpec(cipher.getIV());
 
 	    ciphertext = cipher.doFinal(msg.getBytes());
-	    System.out.println("Encrypted Ciphertext: " + new String(ciphertext));
 	} catch (Exception e) {
 	    System.err.print("In encryption: ");
 	    System.err.println(e);
@@ -93,7 +96,6 @@ public class CryptoTests {
 	    iv = new IvParameterSpec(cipher.getIV());
 
 	    ciphertext = cipher.doFinal(msg.getBytes());
-	    System.out.println("Encrypted Ciphertext: " + new String(ciphertext));
 	} catch (Exception e) {
 	    System.err.print("In encryption: ");
 	    System.err.println(e);
@@ -113,12 +115,65 @@ public class CryptoTests {
 	    System.exit(1);
 	}
     }
-    public void testRSA(String msg) {
+    public static void testRSA(String msg) {
+	KeyPairGenerator keyPairGen = null;
+	KeyPair pair = null;
+	Cipher cipher = null;
+	byte[] ciphertext = null;
+	byte[] plaintext = null;
+	Signature sign = null;
+	byte[] signature = null;
 	//Generate keypair
+	try {
+	    keyPairGen = KeyPairGenerator.getInstance("RSA", "BC");
+	    keyPairGen.initialize(1024, new SecureRandom());
+	
+	    pair = keyPairGen.generateKeyPair();
+	    cipher = Cipher.getInstance("RSA/NONE/OAEPWithSHA256AndMGF1Padding", "BC");
+	    cipher.init(Cipher.ENCRYPT_MODE, pair.getPublic());
+	} catch (Exception e) {
+	    System.err.print("In key generation: ");
+	    System.err.println(e);
+	    System.exit(1);
+	}
 	//encrypt msg
-	//decrypt ciphertext
-	//print plaintext
+	try {   
+	    ciphertext = cipher.doFinal(msg.getBytes());
+	    //decrypt ciphertext
+	    cipher.init(Cipher.DECRYPT_MODE, pair.getPrivate());
+	    plaintext = cipher.doFinal(ciphertext);
+	    System.out.println("Decrypted Plaintext: " + new String(plaintext));
+	} catch (Exception e) {
+	    System.err.print("In encrypt/decrypt: ");
+	    System.err.println(e);
+	    System.exit(1);
+	}
 	//generate RSA signature over msg
+	try {
+	System.out.println("Signing message...");
+	sign = Signature.getInstance("SHA256withRSA", "BC");
+	sign.initSign(pair.getPrivate());
+
+	sign.update(msg.getBytes());
+	signature = sign.sign();
+	} catch (Exception e) {
+	    System.err.print("In RSA signing: ");
+	    System.err.println(e);
+	    System.exit(1);
+	}
 	//verify signature, print verified
+	try {
+	    sign.initVerify(pair.getPublic());
+	    sign.update(msg.getBytes());
+	    if(sign.verify(signature)) {
+		System.out.println("Verified RSA signature!");
+	    } else {
+		System.out.println("Failed to verify RSA signature.");
+	    }
+	} catch (Exception e) {
+	    System.err.print("In signature verification: ");
+	    System.err.println(e);
+	    System.exit(1);
+	}
     }
 }
